@@ -10,7 +10,9 @@ const _Matter = {
 	// @ts-ignore
 	Composite: Matter.Composite,
 	// @ts-ignore
-	Events: Matter.Events
+	Events: Matter.Events,
+	// @ts-ignore
+	Vertices: Matter.Vertices
 }
 
 class MatterBody {
@@ -73,6 +75,13 @@ class MatterBody {
 			y: Math.max(minY, Math.min(maxY, this.position.y))
 		}
 	}
+	/**
+	 * @param {{ x: number, y: number }} pos
+	 */
+	isPointInsideShape(pos) {
+		var vertices = this._body.vertices
+		return _Matter.Vertices.contains(vertices, pos)
+	}
 }
 class Composite {
 	/**
@@ -100,6 +109,12 @@ class Composite {
 		} else {
 			_Matter.Composite.remove(this._com, body._body)
 		}
+	}
+	/**
+	 * @param {MatterBody} body
+	 */
+	includes(body) {
+		return this._com.bodies.includes(body._body)
 	}
 }
 class Engine {

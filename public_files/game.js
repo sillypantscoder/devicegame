@@ -26,7 +26,9 @@ function createPlayer() {
 		// key listeners
 		document.addEventListener("keydown", (e) => {
 			if (e.key.startsWith("Arrow")) e.preventDefault()
-			if (e.key == "ArrowUp") playerBody.vy -= 9;
+			if (e.key == "ArrowUp") {
+				if (canPlayerJump()) playerBody.vy -= 9;
+			}
 			if (e.key == "ArrowLeft") pressingLeft = true
 			if (e.key == "ArrowRight") pressingRight = true
 		})
@@ -141,7 +143,7 @@ class Door extends SceneItem {
 	 * @param {number} y
 	 * @param {number} w
 	 * @param {number} h
-	 * @param {() => boolean} getIsActivated
+	 * @param {(source: Door) => boolean} getIsActivated
 	 */
 	constructor(x, y, w, h, getIsActivated) {
 		super()
@@ -154,10 +156,10 @@ class Door extends SceneItem {
 		// Activation
 		this.activated = true
 		this.getIsActivated = getIsActivated
-		this.timer = { v: 0, max: 9 }
+		this.timer = { v: 5, max: 5 }
 	}
 	updateActivation() {
-		var newState = this.getIsActivated()
+		var newState = this.getIsActivated(this)
 		if (newState && !this.activated) {
 			// Activate
 			engine.world.add(this.body)
@@ -178,6 +180,47 @@ class Door extends SceneItem {
 		// Element
 		this.elm.setAttribute("style", `left: ${this.x}px; top: ${this.y}px; width: ${this.w}px; height: ${this.h}px; background: ${this.activated ? "gray" : "transparent"}; outline: 1px solid black;`)
 	}
+}
+class BrightnessDoor extends Door {
+	/**
+	 * @param {number} x
+	 * @param {number} y
+	 * @param {number} w
+	 * @param {number} h
+	 * @param {(fraction: number, activated: boolean) => boolean} brightnessCheck
+	 */
+	constructor(x, y, w, h, brightnessCheck) {
+		super(x, y, w, h, (door) => {
+			// Find average brightness in the camera image
+			var total = 0;
+			var max = 0;
+			for (var y = 0; y < camera_data.length; y++) {
+				for (var x = 0; x < camera_data[y].length; x++) {
+					var pixel = camera_data[y][x]
+					var value = pixel.r + pixel.g + pixel.b
+					total += value;
+					max += 255 + 255 + 255;
+				}
+			}
+			var fraction = total / max;
+			return brightnessCheck(fraction, door.activated)
+		})
+	}
+}
+
+function canPlayerJump() {
+	var checkPoint = {
+		x: player.position.x,
+		y: player.position.y + 30
+	}
+	// look through all the bodies
+	for (var i = 0; i < scene.length; i++) {
+		var body = scene[i].body
+		if (body == null) continue
+		if (! engine.world.includes(body)) continue
+		if (body.isPointInsideShape(checkPoint)) return true;
+	}
+	return false;
 }
 
 var currentLevelNo = 0
@@ -217,7 +260,7 @@ var camera_data = [];
 	// Start the animation loop!
 	var loop_pos = 0
 	function handleVideoFrame() {
-		if ((loop_pos += 1) % 10 == 0) {
+		if ((loop_pos += 1) % 7 == 0) {
 			ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 			var data = ctx.getImageData(0, 0, canvas.width, canvas.height).data
 			// Parse the data
