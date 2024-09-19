@@ -1,6 +1,6 @@
 class Level {
 	/**
-	 * @param {(objects: SceneItem[]) => void} builder
+	 * @param {(game: Game) => void} builder
 	 */
 	constructor(builder) {
 		this.build = builder
@@ -8,14 +8,16 @@ class Level {
 }
 
 const levels = [
-	new Level((scene) => {
+	new Level((game) => {
 		// floor
-		scene.push(new Wall(0, 180, 250, 50));
+		new Wall(game, 0, 180, 250, 50).add();
 		// door
-		scene.push(new BrightnessDoor(250, 180, 250, 50, (fraction, activated) => {
+		new BrightnessDoor(game, 250, 180, 250, 50, (fraction, activated) => {
 			return fraction < (activated ? 0.5 : 0.3);
-		}));
-		scene.push(new Door(500, 180, 250, 50, (door) => {
+		}).add();
+		var door = new Door(game, 500, 180, 250, 50);
+		door.getIsActivated = function () {
+			var camera_data = this.game.camera.camera_data
 			// Find average red value in the camera image
 			var values = { r: 0, g: 0, b: 0 };
 			var max = 0;
@@ -28,14 +30,15 @@ const levels = [
 					max += 255;
 				}
 			}
-			var redCheck = values.r * 0.7
-			if (door.activated) redCheck = values.r * 0.9;
+			var amtCheck = values.g * 0.7
+			if (door.activated) amtCheck = values.g * 0.8;
 			console.log(
 				"r: " + "|".repeat(Math.round(values.r / 1000000)) + "\n" +
 				"g: " + "|".repeat(Math.round(values.g / 1000000)) + "\n" +
 				"b: " + "|".repeat(Math.round(values.b / 1000000)) + "\n" +
-				"R: " + "|".repeat(Math.round(redCheck / 1000000)))
-			return redCheck > values.g && redCheck > values.b
-		}));
+				"G: " + "|".repeat(Math.round(amtCheck / 1000000)))
+			return amtCheck > values.r && amtCheck > values.b
+		};
+		door.add();
 	})
 ]
