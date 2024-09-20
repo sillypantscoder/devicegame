@@ -92,7 +92,7 @@ class Player extends SceneItem {
 		document.addEventListener("keydown", (e) => {
 			if (e.key.startsWith("Arrow")) e.preventDefault()
 			if (e.key == "ArrowUp") {
-				if (_player.canJump()) _player.body.vy -= 9;
+				if (_player.canJump()) _player.body.vy -= 13;
 			}
 			if (e.key == "ArrowLeft") _player.pressingLeft = true
 			if (e.key == "ArrowRight") _player.pressingRight = true
@@ -246,8 +246,10 @@ class Door extends SceneItem {
 	 * @param {number} y
 	 * @param {number} w
 	 * @param {number} h
+	 * @param {boolean} initialState
+	 * @param {Activator} activator
 	 */
-	constructor(game, x, y, w, h) {
+	constructor(game, x, y, w, h, initialState, activator) {
 		super(game)
 		this.x = x
 		this.y = y
@@ -256,63 +258,170 @@ class Door extends SceneItem {
 		this.body = Bodies.rectangleFromTopLeft(x, y, w, h, true)
 		this.elm = document.createElement("div")
 		// Activation
-		this.activated = true
-		this.timer = { v: 5, max: 5 }
+		this.activator = activator;
 	}
-	getIsActivated() {
-		return true;
+	activate() {
+		this.game.engine.world.add(this.body)
+	}
+	deactivate() {
+		this.game.engine.world.remove(this.body)
+	}
+	add() {
+		super.add()
+		if (!this.activator.isActivated()) {
+			this.deactivate()
+		}
 	}
 	updateActivation() {
-		var newState = this.getIsActivated()
+		this.activator.tick()
+		// Check whether we are actually activated
+		var newState = this.activator.isActivated()
 		if (newState && !this.activated) {
-			// Activate
-			this.game.engine.world.add(this.body)
+			this.activate()
 		}
 		if (this.activated && !newState) {
-			// Deactivate
-			this.game.engine.world.remove(this.body)
+			this.deactivate()
 		}
 		this.activated = newState
 	}
 	update() {
-		// Timer
-		this.timer.v += 1;
-		if (this.timer.v >= this.timer.max) {
-			this.timer.v = 0;
-			this.updateActivation();
-		}
+		// Activation
+		this.updateActivation();
 		// Element
 		this.elm.setAttribute("style", `left: ${this.x}px; top: ${this.y}px; width: ${this.w}px; height: ${this.h}px; background: ${this.activated ? "gray" : "transparent"}; outline: 1px solid black;`)
 	}
 }
-class BrightnessDoor extends Door {
+// class BrightnessDoor extends Door {
+// 	/**
+// 	 * @param {Game} game
+// 	 * @param {number} x
+// 	 * @param {number} y
+// 	 * @param {number} w
+// 	 * @param {number} h
+// 	 * @param {boolean} initialState
+// 	 * @param {(fraction: number, activated: boolean) => boolean} brightnessCheck
+// 	 */
+// 	constructor(game, x, y, w, h, initialState, brightnessCheck) {
+// 		super(game, x, y, w, h, initialState)
+// 		this.brightnessCheck = brightnessCheck
+// 	}
+// 	getNeedsActivation() {
+// 		var camera_data = this.game.camera.camera_data;
+// 		// Find average brightness in the camera image
+// 		var total = 0;
+// 		var max = 0;
+// 		for (var y = 0; y < camera_data.length; y++) {
+// 			for (var x = 0; x < camera_data[y].length; x++) {
+// 				var pixel = camera_data[y][x]
+// 				var value = pixel.r + pixel.g + pixel.b
+// 				total += value;
+// 				max += 255 + 255 + 255;
+// 			}
+// 		}
+// 		var fraction = total / max;
+// 		return this.brightnessCheck(fraction, this.activation.v != 0)
+// 	}
+// }
+
+class Activator {
 	/**
 	 * @param {Game} game
-	 * @param {number} x
-	 * @param {number} y
-	 * @param {number} w
-	 * @param {number} h
-	 * @param {(fraction: number, activated: boolean) => boolean} brightnessCheck
 	 */
-	constructor(game, x, y, w, h, brightnessCheck) {
-		super(game, x, y, w, h)
-		this.brightnessCheck = brightnessCheck
+	constructor(game) {
+		this.game = game
 	}
-	getIsActivated() {
-		var camera_data = this.game.camera.camera_data;
-		// Find average brightness in the camera image
-		var total = 0;
+	isActivated() {
+		return false;
+	}
+	tick() {}
+}
+class DelayedActivator extends Activator {
+	/**
+	 * @param {Activator} other
+	 * @param {any} maxTime
+	 */
+	constructor(other, maxTime) {
+		super(other.game)
+		this.other = other
+		this.time = 0
+		this.maxTime = maxTime
+	}
+	isActivated() {
+		return this.time > 0;
+	}
+	tick() {
+		this.time -= 1;
+		this.other.tick()
+		if (this.other.isActivated()) {
+			this.time = this.maxTime
+		}
+	}
+}
+class Not extends Activator {
+	/**
+	 * @param {Activator} other
+	 */
+	constructor(other) {
+		super(other.game)
+		this.other = other
+	}
+	isActivated() {
+		return !this.other.isActivated()
+	}
+	tick() {
+		this.other.tick()
+	}
+}
+class CameraColorActivator extends Activator {
+	/**
+	 * @param {Game} game
+	 */
+	constructor(game) {
+		super(game)
+	}
+	getColors() {
+		var camera_data = this.game.camera.camera_data
+		// Find average red value in the camera image
+		var values = { r: 0, g: 0, b: 0 };
 		var max = 0;
 		for (var y = 0; y < camera_data.length; y++) {
 			for (var x = 0; x < camera_data[y].length; x++) {
 				var pixel = camera_data[y][x]
-				var value = pixel.r + pixel.g + pixel.b
-				total += value;
-				max += 255 + 255 + 255;
+				values.r += pixel.r
+				values.g += pixel.g
+				values.b += pixel.b
+				max += 255;
 			}
 		}
-		var fraction = total / max;
-		return this.brightnessCheck(fraction, this.activated)
+		values.r /= max;
+		values.g /= max;
+		values.b /= max;
+		return values
+	}
+}
+class CameraBlackActivator extends CameraColorActivator {
+	/**
+	 * @param {Game} game
+	 */
+	constructor(game) {
+		super(game)
+		this.activated = false
+	}
+	tick() {
+		var colors = this.getColors()
+		var amount = 0.25
+		if (this.activated) amount += 0.3
+		this.activated = colors.r < amount && colors.g < amount && colors.b < amount
+	}
+	isActivated() {
+		return this.activated
+	}
+}
+class CameraRedActivator extends CameraColorActivator {
+	isActivated() {
+		var colors = this.getColors()
+		var multiplier = 0.8
+		return colors.r * multiplier > colors.g && colors.r * multiplier > colors.b
 	}
 }
 
